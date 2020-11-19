@@ -4,11 +4,16 @@
 #include <queue>
 #include <stack>
 
+enum direction
+{
+	LEFT = 1, RIGHT, TOP, DOWN, NOTHING
+};
+
 using namespace std;
 int chargeRow, chargeCol;
-queue<int> ROW;
-queue<int> COL;
-queue<int> DIST;
+queue<int> qrow;
+queue<int> qcol;
+queue<int> qdist;
 
 class MAP {
 public:
@@ -78,50 +83,151 @@ public:
 	robot(int B) : battery(B) {}
 
 	void BFS(MAP & mm) {
-		ROW.push(chargeRow);
-		COL.push(chargeCol);
+		qrow.push(chargeRow);
+		qcol.push(chargeCol);
 
-		while (!ROW.empty()) {
-			int curRow = ROW.front();
-			int curCol = COL.front();
+		while (!qrow.empty()) {
+			int curRow = qrow.front();
+			int curCol = qcol.front();
 			int curDist = mm.dist[curRow][curCol];
-			ROW.pop();
-			COL.pop();
+			qrow.pop();
+			qcol.pop();
 			mm.map[curRow][curCol] = 3;
 
 			// find lefthand side
 			if (curCol > 0) {
 				if (mm.map[curRow][curCol - 1] == 0) {
-					ROW.push(curRow);
-					COL.push(curCol - 1);
+					qrow.push(curRow);
+					qcol.push(curCol - 1);
 					mm.dist[curRow][curCol - 1] = curDist + 1;
 				}
 			}
 			// find top side
 			if (curRow > 0) {
 				if (mm.map[curRow - 1][curCol] == 0) {
-					ROW.push(curRow - 1);
-					COL.push(curCol);
+					qrow.push(curRow - 1);
+					qcol.push(curCol);
 					mm.dist[curRow - 1][curCol] = curDist + 1;
 				}
 			}
 			// find righthand side
 			if (curCol < mm.col - 1) {
 				if (mm.map[curRow][curCol + 1] == 0) {
-					ROW.push(curRow);
-					COL.push(curCol + 1);
+					qrow.push(curRow);
+					qcol.push(curCol + 1);
 					mm.dist[curRow][curCol + 1] = curDist + 1;
 				}
 			}
 			// find down side
 			if (curRow < mm.row - 1) {
 				if (mm.map[curRow + 1][curCol] == 0) {
-					ROW.push(curRow + 1);
-					COL.push(curCol);
+					qrow.push(curRow + 1);
+					qcol.push(curCol);
 					mm.dist[curRow + 1][curCol] = curDist + 1;
 				}
 			}
 		}
+	}
+
+	void DFS(MAP & mm, fstream & fout) {
+		stack<int> srow;
+		stack<int> scol;
+
+		stack<int> back_srow;
+		stack<int> back_scol;
+		
+		stack<int> dir;
+
+		srow.push(chargeRow);
+		scol.push(chargeCol);
+		dir.push(NOTHING);
+
+		while (!srow.empty()) {
+			if (!mm.need_clean) break;
+			int curRow = srow.top();
+			int curCol = scol.top();
+			int lastDir = dir.top();
+			bool go = false;
+
+			srow.pop();
+			scol.pop();
+			back_srow.push(curRow);
+			back_scol.push(curCol);
+			step++;
+			cout << curRow << ' ' << curCol << endl;
+			if (mm.map[curRow][curCol] == 0) {
+				mm.map[curRow][curCol] = 3;
+				mm.need_clean--;
+			}
+			
+			// find lefthand side(1)
+			if (curCol > 0) {
+				if (mm.map[curRow][curCol - 1] == 0) {
+					srow.push(curRow);
+					scol.push(curCol - 1);
+					dir.push(LEFT);	
+					go = true;
+				}
+			}			
+			// find top side
+			if (curRow > 0 && !go) {
+				if (mm.map[curRow - 1][curCol] == 0) {
+					srow.push(curRow - 1);
+					scol.push(curCol);
+					dir.push(TOP);
+					go = true;
+				}
+			}
+			// find righthand side
+			if (curCol < mm.col - 1 && !go) {
+				if (mm.map[curRow][curCol + 1] == 0) {
+					srow.push(curRow);
+					scol.push(curCol + 1);
+					dir.push(RIGHT);
+					go = true;
+				}
+			}
+			// find down side
+			if (curRow < mm.row - 1 && !go) {
+				if (mm.map[curRow + 1][curCol] == 0) {
+					srow.push(curRow + 1);
+					scol.push(curCol);
+					dir.push(DOWN);
+					go = true;
+				}
+			}
+
+			if (!go) {
+				if (lastDir == LEFT) {
+					srow.push(curRow);
+					scol.push(curCol + 1);
+				}
+				else if (lastDir = TOP) {
+					srow.push(curRow + 1);
+					scol.push(curCol);
+				}
+				else if (lastDir = RIGHT) {
+					srow.push(curRow);
+					scol.push(curCol - 1);
+				}
+				else if (lastDir = DOWN) {
+					srow.push(curRow - 1);
+					scol.push(curCol);
+				}
+			}
+		}
+
+		// go back to charge point
+		// pop±¼­«½ÆªºÂI
+		back_srow.pop();
+		back_scol.pop();
+		while (!back_srow.empty()) {
+			step++;
+			cout << back_srow.top() << ' ' << back_scol.top() << endl;
+			back_srow.pop();
+			back_scol.pop();
+		}
+		fout << step;
 	}
 
 	void record(fstream & fout) {
@@ -136,7 +242,7 @@ public:
 int main() {
 	// file operation
 	fstream fin, fout;
-	fin.open("floor2.data", ios::in);
+	fin.open("108062226.data", ios::in);
 	fout.open("final.path", ios::out);
 	int m, n, B;
 	fin >> m >> n >> B;
@@ -146,10 +252,7 @@ int main() {
 	MAP mm(m, n);
 	robot r(B);
 	mm.read(fin);
+	while(mm.need_clean)
+		r.DFS(mm, fout);
 	mm.showmap();
-	mm.showdist();
-	r.BFS(mm);
-	mm.showmap();
-	mm.showdist();
-	r.record(fout);
 }
